@@ -1,6 +1,8 @@
 
 import { ArrowRight, Award, Brain, CheckCircle, Clock, Play, RotateCcw } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+// import ReactPlayer from 'react-player';
+import YouTube from 'react-youtube';
 
 // Fetches learning path from new /learning-path endpoint
 export async function fetchLearningPathAndQuizzes(topic: string) {
@@ -478,55 +480,19 @@ const LearnFlowAI = () => {
                     <div className="flex flex-col items-center w-full">
                       {/* Inline Video Player */}
                       <div className="w-full flex flex-col items-center">
-                        {isYouTubeUrl(videoData.url) ? (
-                          (() => {
-                            const videoId = getYouTubeVideoId(videoData.url);
-                            return videoId ? (
-                              <div className="w-full">
-                                <div className="bg-black rounded-lg mb-3 w-full aspect-video flex flex-col items-center justify-center relative" style={{ minHeight: 200 }}>
-                                  <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                    <div className="text-red-400 text-center">
-                                      An error occurred. Please try again later. (Playback ID: qynswooFW2uKkIez)
-                                      <br />
-                                      <a
-                                        href="https://support.google.com/youtube/answer/150129"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="underline text-teal-400"
-                                      >
-                                        Learn More
-                                      </a>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="text-red-400 mb-2">Invalid YouTube video link.</div>
-                            );
-                          })()
-                        ) : isDirectVideoUrl(videoData.url) ? (
-                          <video
-                            controls
-                            autoPlay
-                            className="rounded-lg mb-3 w-full aspect-video bg-black"
-                            style={{ maxHeight: 400 }}
-                          >
-                            <source src={videoData.url} />
-                            Your browser does not support the video tag.
-                          </video>
-                        ) : (
-                          <div className="text-red-400 mb-2">
-                            Unable to embed this video. <br />
-                            <a
-                              href={videoData.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="underline text-teal-400"
-                            >
-                              Open video in new tab
-                            </a>
-                          </div>
-                        )}
+                        <YouTube
+                          videoId={getYouTubeVideoId(videoData.url)}
+                          opts={{
+                            width: '100%',
+                            height: '360',
+                            playerVars: {
+                              autoplay: 1,
+                              controls: 0, // Hide YouTube controls
+                            },
+                          }}
+                          className="rounded-lg mb-3 aspect-video bg-black"
+                          onReady={() => {}}
+                        />
                       </div>
                       <p className="text-gray-300 text-sm mb-2">{videoData.description}</p>
                       <button
