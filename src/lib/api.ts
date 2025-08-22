@@ -23,9 +23,32 @@ export interface VideoData {
   description: string;
 }
 
+export interface ExtractedYouTubeData {
+  videoUrl: string;
+  transcript: string;
+  summary: string;
+  topics: string[];
+  wordCount: number;
+  timestamp: string;
+}
+
 export interface LearningPathResponse {
   learningPath: LearningPathStep[];
   quizzes: Record<string, any>;
+}
+
+export interface KnowledgeCheckQuestion {
+  type: 'mcq' | 'true_false' | 'short_answer';
+  question: string;
+  options: string[] | null;
+  answer: string | boolean;
+  explanation: string;
+}
+
+export interface KnowledgeCheckResponse {
+  questions: KnowledgeCheckQuestion[];
+  count: number;
+  timestamp: string;
 }
 
 // Fetches learning path from new /learning-path endpoint
@@ -95,3 +118,65 @@ export async function fetchBestVideo(topic: string): Promise<VideoData> {
     throw new Error("Failed to fetch or parse best video from backend");
   }
 } 
+
+// Extracts transcript and metadata for a given YouTube URL
+export async function extractYouTubeContent(videoUrl: string): Promise<ExtractedYouTubeData> {
+  try {
+    console.log("starting of extractYouTubeContent");
+    
+    const response = await fetch('http://localhost:9000/api/youtube/extract', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      // body: JSON.stringify({ videoUrl }),
+      body: JSON.stringify({  videoUrl:"https://www.youtube.com/watch?v=1aA1WGON49E&ab_channel=TEDxTalks" }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to extract YouTube content from backend');
+    }
+
+    const data = await response.json();
+
+    console.log("response of extractYouTubeContent", data);
+    if (data && data.success && data.data) {
+      return data.data as ExtractedYouTubeData;
+    }
+    throw new Error('No extraction data returned');
+  } catch (error) {
+    console.error('Error extracting YouTube content:', error);
+    throw new Error('Failed to extract or parse YouTube content from backend');
+  }
+}
+
+// Fetches knowledge check questions for a given transcript, summary, and topics
+export async function fetchKnowledgeCheck(input: {
+  transcript: string;
+  summary: string;
+  topics: string[];
+}): Promise<KnowledgeCheckResponse> {
+  try {
+    const response = await fetch('http://localhost:9000/api/youtube/knowledge-check', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(input),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch knowledge check from backend');
+    }
+
+    const data = await response.json();
+
+    if (data && data.success && data.data) {
+      return data.data as KnowledgeCheckResponse;
+    }
+    throw new Error('No knowledge check data returned');
+  } catch (error) {
+    console.error('Error fetching knowledge check:', error);
+    throw new Error('Failed to fetch or parse knowledge check from backend');
+  }
+}

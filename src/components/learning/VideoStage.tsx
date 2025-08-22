@@ -2,7 +2,7 @@ import { Play } from 'lucide-react';
 import YouTube from 'react-youtube';
 import { LearningPathStep, VideoData } from '../../lib/api';
 import { getYouTubeVideoId, isYouTubeUrl, validateVideoUrl } from '../../lib/utils';
-
+import React from 'react';
 interface VideoStageProps {
   currentStep: number;
   learningPath: LearningPathStep[];
@@ -22,6 +22,7 @@ export function VideoStage({
   onBackToPath,
   onVideoComplete,
 }: VideoStageProps) {
+
   // Get video ID and validate it more thoroughly
   const videoId = videoData?.url ? getYouTubeVideoId(videoData.url) : null;
   const isValidYouTubeVideo = videoData &&
@@ -51,7 +52,9 @@ export function VideoStage({
   const handleNativeVideoEnd = () => {
     onVideoComplete();
   };
-
+  React.useEffect(()=>{
+    onVideoComplete
+  },[])
   // Helper: Render the video player (YouTube or direct video)
   function renderVideoPlayer() {
     if (isValidYouTubeVideo && videoId) {

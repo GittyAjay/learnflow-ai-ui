@@ -1,16 +1,20 @@
-import { LearningPathStep } from '../../lib/api';
+import { LearningPathStep, type ExtractedYouTubeData, type KnowledgeCheckQuestion } from '../../lib/api';
 
 interface QuizStageProps {
   currentStep: number;
   learningPath: LearningPathStep[];
-  quizzes: Record<string, any>;
+  quizzes: Record<string, { questions: { question: string; options: string[]; correct: number; explanation?: string; type?: string }[] }>;
   selectedAnswers: { [key: number]: number };
   showResults: boolean;
   quizScore: number | null;
+  extractLoading: boolean;
+  extractError: string | null;
+  extractedContent: ExtractedYouTubeData | null;
   onAnswerSelect: (questionIndex: number, answerIndex: number) => void;
   onSubmit: () => void;
 }
 
+// The quizzes prop is now expected to already be in the correct format: { questions: [{question, options, correct, ...}] }
 export function QuizStage({
   currentStep,
   learningPath,
@@ -18,10 +22,15 @@ export function QuizStage({
   selectedAnswers,
   showResults,
   quizScore,
+  extractLoading,
+  extractError,
+  extractedContent,
   onAnswerSelect,
   onSubmit,
 }: QuizStageProps) {
-  const currentQuiz = quizzes[learningPath[currentStep]?.id] || { questions: [] };
+  const stepId = learningPath[currentStep]?.id;
+  const currentQuiz = quizzes[stepId];
+  const questions = currentQuiz?.questions || [];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-900 to-purple-900 p-6 flex items-center justify-center">
@@ -34,7 +43,39 @@ export function QuizStage({
 
           {!showResults ? (
             <div className="space-y-6">
-              {currentQuiz.questions.map((question: any, qIndex: number) => (
+              {/* Extracted context from watched video */}
+              <div className="bg-white/5 rounded-xl p-6">
+                <h3 className="text-white font-semibold mb-3">Context from the video</h3>
+                {extractLoading && (
+                  <p className="text-gray-300">Extracting summary and topics from the video...</p>
+                )}
+                {!extractLoading && extractError && (
+                  <p className="text-red-300">{extractError}</p>
+                )}
+                {!extractLoading && !extractError && extractedContent && (
+                  <div className="text-gray-200 space-y-3">
+                    <p className="whitespace-pre-wrap">{extractedContent.summary}</p>
+                    {extractedContent.topics && extractedContent.topics.length > 0 && (
+                      <div>
+                        <p className="text-gray-300 mt-2 mb-1 font-medium">Topics:</p>
+                        <ul className="list-disc list-inside text-gray-200">
+                          {extractedContent.topics.map((t, i) => (
+                            <li key={i}>{t}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {questions.length === 0 && (
+                <div className="bg-white/5 rounded-xl p-6 text-gray-300 text-center">
+                  No quiz questions available for this step.
+                </div>
+              )}
+
+              {questions.map((question, qIndex) => (
                 <div key={qIndex} className="bg-white/5 rounded-xl p-6">
                   <h3 className="text-white font-semibold mb-4">
                     {qIndex + 1}. {question.question}
@@ -59,7 +100,7 @@ export function QuizStage({
 
               <button
                 onClick={onSubmit}
-                disabled={Object.keys(selectedAnswers).length < currentQuiz.questions.length}
+                disabled={questions.length === 0 || Object.keys(selectedAnswers).length < questions.length}
                 className="w-full bg-gradient-to-r from-teal-500 to-blue-500 text-white font-semibold py-4 px-8 rounded-xl text-lg transition-all duration-300 hover:from-teal-400 hover:to-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Check My Answers
@@ -89,4 +130,4 @@ export function QuizStage({
       </div>
     </div>
   );
-} 
+}
