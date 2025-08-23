@@ -1,5 +1,5 @@
-
 import { useYouTubeTranscript } from '@/hooks/useYouTubeTranscript';
+import React from 'react';
 import { useLearningState } from '../hooks/useLearningState';
 import {
   AdaptiveStage,
@@ -9,8 +9,6 @@ import {
   QuizStage,
   VideoStage,
 } from './learning';
-import { getTranscriptFromUrl } from '@/lib/youtube-transcript-processor';
-import React from 'react';
 
 const LearnFlowAI = () => {
    // Process a YouTube video
@@ -107,6 +105,8 @@ const LearnFlowAI = () => {
             extractLoading={state.extractLoading}
             extractError={state.extractError}
             extractedContent={state.extractedContent}
+            knowledgeCheckLoading={state.knowledgeCheckLoading}
+            knowledgeCheckError={state.knowledgeCheckError}
             onAnswerSelect={handleAnswerSelect}
             onSubmit={handleQuizSubmit}
           />

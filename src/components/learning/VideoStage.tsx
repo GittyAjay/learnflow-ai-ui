@@ -1,14 +1,16 @@
 import { Play } from 'lucide-react';
+import React from 'react';
 import YouTube from 'react-youtube';
 import { LearningPathStep, VideoData } from '../../lib/api';
 import { getYouTubeVideoId, isYouTubeUrl, validateVideoUrl } from '../../lib/utils';
-import React from 'react';
+
 interface VideoStageProps {
   currentStep: number;
   learningPath: LearningPathStep[];
   videoLoading: boolean;
   videoError: string | null;
   videoData: VideoData | null;
+  extractLoading: boolean; // Added this prop
   onBackToPath: () => void;
   onVideoComplete: () => void;
 }
@@ -19,9 +21,13 @@ export function VideoStage({
   videoLoading,
   videoError,
   videoData,
+  extractLoading, // Added this prop
   onBackToPath,
   onVideoComplete,
 }: VideoStageProps) {
+  const [isVideoReady, setIsVideoReady] = React.useState(false);
+  const [hasVideoEnded, setHasVideoEnded] = React.useState(false);
+  const [isMarkingAsWatched, setIsMarkingAsWatched] = React.useState(false);
 
   // Get video ID and validate it more thoroughly
   const videoId = videoData?.url ? getYouTubeVideoId(videoData.url) : null;
@@ -34,27 +40,61 @@ export function VideoStage({
   const videoValidation = videoData ? validateVideoUrl(videoData.url) : null;
 
   // Debug logging
-  if (videoData?.url) {
-    console.log('VideoStage Debug:', {
-      url: videoData.url,
-      videoId,
-      isValidYouTubeVideo,
-      validation: videoValidation
-    });
-  }
+  React.useEffect(() => {
+    if (videoData?.url) {
+      console.log('VideoStage Debug:', {
+        url: videoData.url,
+        videoId,
+        isValidYouTubeVideo,
+        validation: videoValidation
+      });
+    }
+  }, [videoData, videoId, isValidYouTubeVideo, videoValidation]);
 
   // Handler for YouTube video end event
   const handleYouTubeEnd = () => {
-    onVideoComplete();
+    setHasVideoEnded(true);
+    handleVideoCompletion();
   };
 
   // Handler for native video end event
   const handleNativeVideoEnd = () => {
+    setHasVideoEnded(true);
+    handleVideoCompletion();
+  };
+
+  // Handler for YouTube video ready event
+  const handleYouTubeReady = () => {
+    setIsVideoReady(true);
+    console.log('YouTube player ready for video:', videoId);
+  };
+
+  // Handler for manual completion (Mark as Watched button)
+  const handleManualComplete = () => {
+    setIsMarkingAsWatched(true);
+    handleVideoCompletion();
+  };
+
+  // Handle video completion with loading state
+  const handleVideoCompletion = () => {
+    setHasVideoEnded(true);
     onVideoComplete();
   };
-  React.useEffect(()=>{
-    onVideoComplete
-  },[])
+
+  // Reset video state when video data changes
+  React.useEffect(() => {
+    setIsVideoReady(false);
+    setHasVideoEnded(false);
+    setIsMarkingAsWatched(false);
+  }, [videoData]);
+
+  // Show loading when extractLoading is true (video processing)
+  React.useEffect(() => {
+    if (extractLoading) {
+      setIsMarkingAsWatched(true);
+    }
+  }, [extractLoading]);
+
   // Helper: Render the video player (YouTube or direct video)
   function renderVideoPlayer() {
     if (isValidYouTubeVideo && videoId) {
@@ -72,12 +112,11 @@ export function VideoStage({
             },
           }}
           className="rounded-lg aspect-video bg-black w-full"
-          onReady={() => {
-            console.log('YouTube player ready for video:', videoId);
-          }}
+          onReady={handleYouTubeReady}
           onEnd={handleYouTubeEnd}
           onError={(error) => {
             console.error('YouTube player error:', error);
+            setIsVideoReady(false);
           }}
         />
       );
@@ -94,6 +133,8 @@ export function VideoStage({
           autoPlay
           className="rounded-lg aspect-video bg-black w-full object-contain"
           onEnded={handleNativeVideoEnd}
+          onCanPlay={() => setIsVideoReady(true)}
+          onError={() => setIsVideoReady(false)}
         >
           Sorry, your browser doesn't support embedded videos.
         </video>
@@ -136,7 +177,8 @@ export function VideoStage({
           </div>
           <button
             onClick={onBackToPath}
-            className="text-gray-300 hover:text-white transition-colors px-4 py-2 rounded-lg border border-gray-700 bg-gray-800/60 shadow hover:bg-gray-700/80"
+            disabled={isMarkingAsWatched}
+            className="text-gray-300 hover:text-white transition-colors px-4 py-2 rounded-lg border border-gray-700 bg-gray-800/60 shadow hover:bg-gray-700/80 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Back to Path
           </button>
@@ -157,6 +199,13 @@ export function VideoStage({
                 <div className="aspect-video bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
                   <div className="text-center text-white">
                     <div className="text-red-400 mb-4 text-lg font-semibold">{videoError}</div>
+                    <button
+                      onClick={handleManualComplete}
+                      disabled={isMarkingAsWatched}
+                      className="mt-4 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isMarkingAsWatched ? 'Processing...' : 'Continue Anyway'}
+                    </button>
                   </div>
                 </div>
               ) : videoData ? (
@@ -170,12 +219,43 @@ export function VideoStage({
                   <div className="p-6 bg-gray-900/50">
                     <div className="w-full flex flex-col items-center">
                       <p className="text-gray-200 text-base mb-4 mt-2 max-w-2xl text-center leading-relaxed">{videoData.description}</p>
+                      
+                      {/* Show loading indicator while video is loading */}
+                      {!isVideoReady && !hasVideoEnded && (
+                        <div className="flex items-center justify-center mb-4">
+                          <span className="animate-spin rounded-full h-5 w-5 border-b-2 border-teal-400 mr-2"></span>
+                          <span className="text-teal-200 text-sm">Loading video...</span>
+                        </div>
+                      )}
+                      
+                      {/* Show processing indicator when marking as watched */}
+                      {isMarkingAsWatched && (
+                        <div className="flex items-center justify-center mb-4 bg-blue-900/20 px-4 py-2 rounded-lg">
+                          <span className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></span>
+                          <span className="text-white text-sm">Processing video content...</span>
+                        </div>
+                      )}
+                      
                       {/* Show "Mark as Watched" button for all video types */}
                       <button
-                        onClick={onVideoComplete}
-                        className="mt-2 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-8 rounded-lg transition-colors flex items-center mx-auto shadow-lg hover:shadow-xl"
+                        onClick={handleManualComplete}
+                        disabled={hasVideoEnded || isMarkingAsWatched}
+                        className={`mt-2 font-semibold py-3 px-8 rounded-lg transition-colors flex items-center mx-auto shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed ${
+                          hasVideoEnded || isMarkingAsWatched
+                            ? 'bg-green-600 text-white' 
+                            : 'bg-blue-500 hover:bg-blue-600 text-white'
+                        }`}
                       >
-                        Mark as Watched
+                        {isMarkingAsWatched ? (
+                          <>
+                            <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></span>
+                            Processing...
+                          </>
+                        ) : hasVideoEnded ? (
+                          'Video Completed'
+                        ) : (
+                          'Mark as Watched'
+                        )}
                       </button>
                     </div>
                   </div>

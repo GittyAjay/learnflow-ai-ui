@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import {
   extractYouTubeContent,
   fetchBestVideo,
-  fetchLearningPathAndQuizzes,
   fetchKnowledgeCheck,
+  fetchLearningPathAndQuizzes,
   LearningPathStep,
   VideoData,
   type ExtractedYouTubeData,
@@ -27,9 +27,12 @@ export interface LearningState {
   videoLoading: boolean;
   videoError: string | null;
   videoData: VideoData | null;
+  videoOptions: VideoData[] | null;
   extractLoading: boolean;
   extractError: string | null;
   extractedContent: ExtractedYouTubeData | null;
+  knowledgeCheckLoading: boolean;
+  knowledgeCheckError: string | null;
 }
 
 export function useLearningState() {
@@ -49,9 +52,12 @@ export function useLearningState() {
     videoLoading: false,
     videoError: null,
     videoData: null,
+    videoOptions: null,
     extractLoading: false,
     extractError: null,
     extractedContent: null,
+    knowledgeCheckLoading: false,
+    knowledgeCheckError: null,
   });
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -63,18 +69,48 @@ export function useLearningState() {
     }
   }, [state.currentStage]);
 
-  // When entering video stage directly, fetch video if not already loaded
+  // When entering video stage directly, fetch video options if not already loaded
   useEffect(() => {
-    if (state.currentStage === 'video' && !state.videoData && state.learningPath.length > 0) {
-      setState(prev => ({ ...prev, videoLoading: true, videoError: null, videoData: null }));
+    if (
+      state.currentStage === 'video' &&
+      (!state.videoOptions || state.videoOptions.length === 0) &&
+      state.learningPath.length > 0
+    ) {
+      setState(prev => ({
+        ...prev,
+        videoLoading: true,
+        videoError: null,
+        videoData: null,
+        videoOptions: null,
+      }));
 
       fetchBestVideo(state.learningPath[state.currentStep]?.title || state.topic)
-        .then((video) => setState(prev => ({ ...prev, videoData: video, videoLoading: false })))
-        .catch(() => setState(prev => ({
-          ...prev,
-          videoError: 'Failed to load video. Please try again.',
-          videoLoading: false
-        })));
+        .then((videoArr: any) => {
+          // Accepts array of videos, picks the first as default
+          let videos: VideoData[] = [];
+          if (Array.isArray(videoArr)) {
+            videos = videoArr;
+          } else if (videoArr && Array.isArray(videoArr.data)) {
+            videos = videoArr.data;
+          } else if (videoArr && videoArr.title && videoArr.url) {
+            videos = [videoArr];
+          }
+          setState(prev => ({
+            ...prev,
+            videoOptions: videos,
+            videoData: videos.length > 0 ? videos[0] : null,
+            videoLoading: false,
+          }));
+        })
+        .catch(() =>
+          setState(prev => ({
+            ...prev,
+            videoError: 'Failed to load video. Please try again.',
+            videoLoading: false,
+            videoOptions: null,
+            videoData: null,
+          }))
+        );
     }
   }, [state.currentStage, state.currentStep, state.learningPath.length, state.topic]);
 
@@ -97,6 +133,8 @@ export function useLearningState() {
         completedSteps: new Set(),
         adaptiveInserts: [],
         loading: false,
+        videoOptions: null,
+        videoData: null,
       });
     } catch (err: any) {
       updateState({
@@ -113,17 +151,32 @@ export function useLearningState() {
         currentStage: 'video',
         videoLoading: true,
         videoError: null,
-        videoData: null
+        videoData: null,
+        videoOptions: null,
       });
 
       try {
         const step = state.learningPath[stepIndex];
-        const video = await fetchBestVideo(step?.title || state.topic);
-        updateState({ videoData: video, videoLoading: false });
+        const videoArr: any = await fetchBestVideo(step?.title || state.topic);
+        let videos: VideoData[] = [];
+        if (Array.isArray(videoArr)) {
+          videos = videoArr;
+        } else if (videoArr && Array.isArray(videoArr.data)) {
+          videos = videoArr.data;
+        } else if (videoArr && videoArr.title && videoArr.url) {
+          videos = [videoArr];
+        }
+        updateState({
+          videoOptions: videos,
+          videoData: videos.length > 0 ? videos[0] : null,
+          videoLoading: false,
+        });
       } catch (err: any) {
         updateState({
           videoError: 'Failed to load video. Please try again.',
-          videoLoading: false
+          videoLoading: false,
+          videoOptions: null,
+          videoData: null,
         });
       }
     }
@@ -134,17 +187,32 @@ export function useLearningState() {
       currentStage: 'video',
       videoLoading: true,
       videoError: null,
-      videoData: null
+      videoData: null,
+      videoOptions: null,
     });
 
     try {
       const step = state.learningPath[state.currentStep];
-      const video = await fetchBestVideo(step?.title || state.topic);
-      updateState({ videoData: video, videoLoading: false });
+      const videoArr: any = await fetchBestVideo(step?.title || state.topic);
+      let videos: VideoData[] = [];
+      if (Array.isArray(videoArr)) {
+        videos = videoArr;
+      } else if (videoArr && Array.isArray(videoArr.data)) {
+        videos = videoArr.data;
+      } else if (videoArr && videoArr.title && videoArr.url) {
+        videos = [videoArr];
+      }
+      updateState({
+        videoOptions: videos,
+        videoData: videos.length > 0 ? videos[0] : null,
+        videoLoading: false,
+      });
     } catch (err: any) {
       updateState({
         videoError: 'Failed to load video. Please try again.',
-        videoLoading: false
+        videoLoading: false,
+        videoOptions: null,
+        videoData: null,
       });
     }
   };
@@ -158,7 +226,12 @@ export function useLearningState() {
 
       try {
         const extracted = await extractYouTubeContent(videoUrl);
-        updateState({ extractedContent: extracted, extractLoading: false });
+        updateState({ 
+          extractedContent: extracted, 
+          extractLoading: false,
+          knowledgeCheckLoading: true,
+          knowledgeCheckError: null
+        });
 
         // Fetch knowledge check using extracted content
         const knowledgeCheck: KnowledgeCheckResponse = await fetchKnowledgeCheck({
@@ -215,12 +288,15 @@ export function useLearningState() {
           quizzes: {
             ...prev.quizzes,
             [stepId]: { questions: mappedQuestions }
-          }
+          },
+          knowledgeCheckLoading: false
         }));
       } catch (err) {
         updateState({
           extractError: 'Failed to extract video content or fetch quiz questions',
-          extractLoading: false
+          extractLoading: false,
+          knowledgeCheckLoading: false,
+          knowledgeCheckError: 'Failed to generate quiz questions'
         });
       }
     }
@@ -233,6 +309,7 @@ export function useLearningState() {
       videoData: null,
       videoError: null,
       videoLoading: false,
+      videoOptions: null,
     });
   };
 
@@ -314,7 +391,17 @@ export function useLearningState() {
       extractLoading: false,
       extractError: null,
       extractedContent: null,
+      videoOptions: null,
+      knowledgeCheckLoading: false,
+      knowledgeCheckError: null,
     });
+  };
+
+  // Optionally: allow user to select a different video from the options
+  const selectVideoOption = (index: number) => {
+    if (state.videoOptions && state.videoOptions[index]) {
+      updateState({ videoData: state.videoOptions[index] });
+    }
   };
 
   return {
@@ -329,5 +416,6 @@ export function useLearningState() {
     handleAdaptiveInsert,
     handleQuizPass,
     resetExperience,
+    selectVideoOption,
   };
 }
